@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soil Property Prediction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-image: url('/static/image.png/'); /* Replace with your background image */
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-position: center;
+            margin: 0;
+            padding: 0;
+        }
+        #container {
+            width: 90%;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        form {
+            max-width: 400px;
+            margin: auto;
+        }
+        label {
+            display: inline-block;
+            width: 120px;
+            margin-top: 10px;
+        }
+        input[type="text"] {
+            width: calc(100% - 130px);
+            padding: 5px;
+            font-size: 0.9em;
+        }
+        input[type="submit"] {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1em;
+            display: block;
+            margin: 20px auto;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        .result {
+            margin-top: 20px;
+            width: 100%;
+            overflow-x: auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .result table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .result th, .result td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+        .result th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Soil Property Prediction</h1>
+        <form id="predict-form">
+            <div>
+                {% for i in range(1, 19) %}
+                <label for="feature{{ i }}">Reflectance {{ i }}:</label>
+                <input type="text" id="feature{{ i }}" name="feature{{ i }}" required><br>
+                {% endfor %}
+            </div>
+            <input type="submit" value="Predict">
+        </form>
+        <div id="predicted" class="result" style="display:none;">
+            <h2>Predicted Soil Properties</h2>
+            <div id="output-predicted"></div>
+        </div>
+        <div id="metrics" class="result" style="display:none;">
+            <h2>R2 and RMSE Metrics</h2>
+            <div id="output-metrics"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('predict-form').onsubmit = function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const predictedDiv = document.getElementById('predicted');
+                const outputPredictedDiv = document.getElementById('output-predicted');
+                const metricsDiv = document.getElementById('metrics');
+                const outputMetricsDiv = document.getElementById('output-metrics');
+                
+                outputPredictedDiv.innerHTML = '';
+                outputMetricsDiv.innerHTML = '';
+                
+                if (data.error) {
+                    outputPredictedDiv.innerHTML = `<p style="color:red;">${data.message}</p>`;
+                    predictedDiv.style.display = 'block';
+                    return;
+                }
+                
+                const predictions = data.predictions;
+                const metrics = data.metrics;
+
+                // Predicted Values Table
+                let predictedHTML = '<table>';
+                let firstModel = true;
+                for (const [model, prediction] of Object.entries(predictions)) {
+                    if (firstModel) {
+                        predictedHTML += '<tr><th>Model</th>';
+                        for (const property of Object.keys(prediction)) {
+                            predictedHTML += `<th>${property}</th>`;
+                        }
+                        predictedHTML += '</tr>';
+                        firstModel = false;
+                    }
+                    predictedHTML += `<tr><td>${model}</td>`;
+                    for (const value of Object.values(prediction)) {
+                        predictedHTML += `<td>${value.toFixed(2)}</td>`;
+                    }
+                    predictedHTML += '</tr>';
+                }
+                predictedHTML += '</table>';
+                outputPredictedDiv.innerHTML = predictedHTML;
+
+                // Metrics Tables
+                for (const [model, modelMetrics] of Object.entries(metrics)) {
+                    let metricsHTML = `<h3>${model}</h3><table>`;
+                    metricsHTML += '<tr><th>Nutrient</th><th>R2</th><th>RMSE</th></tr>';
+                    for (const nutrient of Object.keys(modelMetrics.R2)) {
+                        metricsHTML += `<tr><td>${nutrient}</td><td>${modelMetrics.R2[nutrient].toFixed(2)}</td><td>${modelMetrics.RMSE[nutrient].toFixed(2)}</td></tr>`;
+                    }
+                    metricsHTML += '</table>';
+                    outputMetricsDiv.innerHTML += metricsHTML;
+                }
+
+                predictedDiv.style.display = 'block';
+                metricsDiv.style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        };
+    </script>
+</body>
+</html>
